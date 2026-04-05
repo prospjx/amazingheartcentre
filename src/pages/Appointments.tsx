@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, Clock, User, Mail, Phone, Stethoscope, Send } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { sendAppointmentNotification, supabase } from '../lib/supabase';
 
 export default function Appointments() {
   const [formData, setFormData] = useState({
@@ -57,6 +57,10 @@ export default function Appointments() {
         ]);
 
       if (error) throw error;
+
+		await sendAppointmentNotification(formData).catch((notificationError) => {
+			console.error('Error sending appointment notification:', notificationError);
+		});
 
       setSubmitMessage(
         'Appointment request submitted successfully! Our team will review and confirm your appointment within 24 hours. Check your email for confirmation.'

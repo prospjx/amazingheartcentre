@@ -19,3 +19,50 @@ export const supabase = createClient(
 );
 
 export { isSupabaseConfigured };
+
+type AppointmentNotificationPayload = {
+	patient_name: string;
+	patient_email: string;
+	patient_phone: string;
+	appointment_date: string;
+	appointment_time: string;
+	service_type: string;
+	symptoms?: string;
+};
+
+type ContactNotificationPayload = {
+	name: string;
+	email: string;
+	phone?: string;
+	subject: string;
+	message: string;
+};
+
+async function invokeNotificationFunction(
+	functionName: string,
+	body: AppointmentNotificationPayload | ContactNotificationPayload
+) {
+	if (!isSupabaseConfigured) {
+		return { skipped: true };
+	}
+
+	const { error, data } = await supabase.functions.invoke(functionName, {
+		body,
+	});
+
+	if (error) {
+		throw error;
+	}
+
+	return data;
+}
+
+export function sendAppointmentNotification(
+	payload: AppointmentNotificationPayload
+) {
+	return invokeNotificationFunction('send-appointment-notification', payload);
+}
+
+export function sendContactNotification(payload: ContactNotificationPayload) {
+	return invokeNotificationFunction('send-contact-notification', payload);
+}
