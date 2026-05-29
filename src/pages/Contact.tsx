@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react';
-import { sendContactNotification, supabase } from '../lib/supabase';
+import {
+  insertContactSubmission,
+  sendContactNotification,
+} from '../lib/supabase';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -33,11 +36,7 @@ export default function Contact() {
     setSubmitError('');
 
     try {
-      const { error } = await supabase
-        .from('contact_submissions')
-        .insert([formData]);
-
-      if (error) throw error;
+      await insertContactSubmission(formData);
 
 		await sendContactNotification(formData).catch((notificationError) => {
 			console.error('Error sending contact notification:', notificationError);

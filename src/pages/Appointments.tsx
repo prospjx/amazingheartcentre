@@ -1,6 +1,38 @@
 import { useState } from 'react';
 import { Calendar, Clock, User, Mail, Phone, Stethoscope, Send } from 'lucide-react';
-import { sendAppointmentNotification, supabase } from '../lib/supabase';
+import {
+  isSupabaseConfigured,
+  insertAppointmentRequest,
+  sendAppointmentNotification,
+} from '../lib/supabase';
+
+type SupabaseLikeError = {
+  code?: string;
+  message?: string;
+};
+
+const getBookingErrorMessage = (error: unknown): string => {
+  const supabaseError = error as SupabaseLikeError;
+  const message = (supabaseError?.message || '').toLowerCase();
+
+  if (!isSupabaseConfigured) {
+    return 'Booking is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables.';
+  }
+
+  if (supabaseError?.code === 'PGRST205' || message.includes('relation') && message.includes('appointments')) {
+    return 'Appointments table was not found. Run your Supabase migrations and try again.';
+  }
+
+  if (message.includes('row-level security') || message.includes('permission denied')) {
+    return 'Booking is currently blocked by database permissions. Verify your RLS INSERT policy for appointments.';
+  }
+
+  if (message.includes('failed to fetch') || message.includes('network')) {
+    return 'Could not reach the booking service. Check your internet connection and Supabase URL.';
+  }
+
+  return 'Failed to book appointment. Please try again.';
+};
 
 export default function Appointments() {
   const [formData, setFormData] = useState({
@@ -46,17 +78,17 @@ export default function Appointments() {
     setSubmitMessage('');
     setSubmitError('');
 
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .insert([
-          {
-            ...formData,
-            status: 'pending',
-          },
-        ]);
+    if (!isSupabaseConfigured) {
+      setSubmitError(getBookingErrorMessage(null));
+      setIsSubmitting(false);
+      return;
+    }
 
-      if (error) throw error;
+    try {
+      await insertAppointmentRequest({
+        ...formData,
+        status: 'pending',
+      });
 
 		await sendAppointmentNotification(formData).catch((notificationError) => {
 			console.error('Error sending appointment notification:', notificationError);
@@ -76,7 +108,7 @@ export default function Appointments() {
       });
       setTimeout(() => setSubmitMessage(''), 5000);
     } catch (error) {
-      setSubmitError('Failed to book appointment. Please try again.');
+      setSubmitError(getBookingErrorMessage(error));
       console.error('Error:', error);
     } finally {
       setIsSubmitting(false);
@@ -296,12 +328,6 @@ export default function Appointments() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-red-600 font-bold">•</span>
-                    <span>
-                      Appointment duration: 20-50 minutes depending on your condition
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 font-bold">•</span>
                     <span>Cancellations must be made 24 hours in advance</span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -322,10 +348,6 @@ export default function Appointments() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-blue-600 font-bold">✓</span>
-                    Insurance card
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-blue-600 font-bold">✓</span>
                     Current medications list
                   </li>
                   <li className="flex items-center gap-2">
@@ -341,7 +363,7 @@ export default function Appointments() {
                   Call us directly to discuss your appointment needs:
                 </p>
                 <p className="text-lg font-bold text-red-600">
-                  (555) 123-4567
+                  (+234) 081 8627 2417
                 </p>
               </div>
             </div>
